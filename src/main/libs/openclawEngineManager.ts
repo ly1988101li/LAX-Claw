@@ -1,5 +1,5 @@
 import { app, utilityProcess, type UtilityProcess } from 'electron';
-import { spawn, execFile, type ChildProcess } from 'child_process';
+import { spawn, type ChildProcess } from 'child_process';
 import crypto from 'crypto';
 import { EventEmitter } from 'events';
 import fs from 'fs';
@@ -400,8 +400,7 @@ export class OpenClawEngineManager extends EventEmitter {
     });
 
     const compileCacheDir = path.join(this.stateDir, '.compile-cache');
-    const cacheWarm = fs.existsSync(compileCacheDir) && fs.readdirSync(compileCacheDir).length > 0;
-    console.log(`[OpenClaw] compile cache: dir=${compileCacheDir}, warm=${cacheWarm}`);
+    console.log(`[OpenClaw] compile cache dir: ${compileCacheDir}`);
     const electronNodeRuntimePath = getElectronNodeRuntimePath();
     const cliShimDir = this.ensureBundledCliShims();
 
@@ -452,7 +451,6 @@ export class OpenClawEngineManager extends EventEmitter {
     // cold ESM compilation on Windows (163s vs 34s for a 28MB bundle).
     let child: GatewayProcess;
     if (process.platform === 'win32') {
-      await this.warmupCompileCacheIfNeeded(runtime.root, compileCacheDir, env);
       child = spawn(
         process.execPath,
         [openclawEntry, ...forkArgs],
@@ -738,76 +736,6 @@ export class OpenClawEngineManager extends EventEmitter {
     }
   }
 
-  /**
-   * On Windows, pre-warm the V8 compile cache before starting the gateway.
-   * This reduces cold startup from ~34s to ~4s by pre-compiling the 28MB bundle.
-   * Skipped if the compile cache directory already contains cached bytecode.
-   */
-  private async warmupCompileCacheIfNeeded(
-    runtimeRoot: string,
-    compileCacheDir: string,
-    env: NodeJS.ProcessEnv,
-  ): Promise<void> {
-    // Check if compile cache already has content (any subdirectory with files).
-    try {
-      if (fs.existsSync(compileCacheDir)) {
-        const entries = fs.readdirSync(compileCacheDir);
-        if (entries.length > 0) {
-          console.log(`[OpenClaw] compile cache exists (${entries.length} entries), skipping warmup`);
-          return;
-        }
-      }
-    } catch {
-      // ignore read errors
-    }
-
-    const warmupScript = findPath([
-      path.join(runtimeRoot, 'warmup-compile-cache.cjs'),
-      path.join(runtimeRoot, '..', 'warmup-compile-cache.cjs'),
-    ]);
-    if (!warmupScript) {
-      console.log('[OpenClaw] warmup script not found, skipping compile cache warmup');
-      return;
-    }
-
-    console.log(`[OpenClaw] First start detected — warming up compile cache...`);
-    this.setStatus({
-      phase: 'starting',
-      version: this.status.version,
-      progressPercent: 5,
-      message: 'First start: warming up compile cache...',
-      canRetry: false,
-    });
-
-    const t0 = Date.now();
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const child = execFile(
-          process.execPath,
-          [warmupScript, '--cache-dir', compileCacheDir],
-          {
-            cwd: runtimeRoot,
-            env: { ...env, ELECTRON_RUN_AS_NODE: '1' },
-            timeout: 120_000,
-            windowsHide: true,
-          },
-          (err) => {
-            if (err) reject(err);
-            else resolve();
-          },
-        );
-        child.stderr?.on('data', (chunk: Buffer | string) => {
-          const text = typeof chunk === 'string' ? chunk : chunk.toString();
-          console.log(`[OpenClaw warmup] ${text.trimEnd()}`);
-        });
-      });
-      console.log(`[OpenClaw] compile cache warmup completed in ${Date.now() - t0}ms`);
-    } catch (err) {
-      // Warmup failure is not fatal — gateway can still start (just slower).
-      console.warn(`[OpenClaw] compile cache warmup failed (${Date.now() - t0}ms):`, err);
-    }
-  }
-
   private copyDirFromAsar(srcDir: string, destDir: string): void {
     fs.mkdirSync(destDir, { recursive: true });
     const entries = fs.readdirSync(srcDir, { withFileTypes: true });
@@ -971,15 +899,18 @@ export class OpenClawEngineManager extends EventEmitter {
       `const { pathToFileURL } = require('node:url');\n` +
       `const path = require('node:path');\n` +
       `const fs = require('node:fs');\n` +
-      `// Enable V8 compile cache to speed up subsequent startups.\n` +
+      `const _log = (msg) => process.stderr.write('[openclaw-launcher] ' + msg + '\\n');\n` +
+      `const _t0 = Date.now();\n` +
+      `const _elapsed = () => (Date.now() - _t0) + 'ms';\n` +
+      `// ─── Compile cache setup ───\n` +
       `try {\n` +
-      `  const { enableCompileCache } = require('node:module');\n` +
-      `  const ccDir = path.join(process.env.OPENCLAW_STATE_DIR || __dirname, '.compile-cache');\n` +
-      `  enableCompileCache(ccDir);\n` +
-      `  process.stderr.write('[openclaw-launcher] compile-cache dir=' + require('node:module').getCompileCacheDir() + '\\n');\n` +
+      `  const { enableCompileCache, getCompileCacheDir } = require('node:module');\n` +
+      `  const _ccDir = path.join(process.env.OPENCLAW_STATE_DIR || __dirname, '.compile-cache');\n` +
+      `  enableCompileCache(_ccDir);\n` +
+      `  _log('compile-cache dir=' + getCompileCacheDir());\n` +
       `} catch (_) {}\n` +
+      `// ─── Load bundle ───\n` +
       `const bundlePath = path.join(__dirname, 'gateway-bundle.mjs');\n` +
-      `// Patch argv so openclaw's isMainModule() recognizes this as the main entry.\n` +
       `const _realpath = (p) => { try { return fs.realpathSync(path.resolve(p)); } catch { return path.resolve(p); } };\n` +
       `const _launcherInArgv = process.argv[1] &&\n` +
       `  _realpath(process.argv[1]).toLowerCase() === _realpath(__filename).toLowerCase();\n` +
@@ -988,18 +919,14 @@ export class OpenClawEngineManager extends EventEmitter {
       `} else {\n` +
       `  process.argv.splice(1, 0, bundlePath);\n` +
       `}\n` +
-      `process.stderr.write('[openclaw-launcher] argv=' + JSON.stringify(process.argv) + '\\n');\n` +
-      `process.stderr.write('[openclaw-launcher] node=' + process.versions.node + '\\n');\n` +
-      `// Keep the event loop alive while the gateway starts.\n` +
       `const _keepAlive = setInterval(() => {}, 30000);\n` +
-      `const t0 = Date.now();\n` +
       `const bundleUrl = pathToFileURL(bundlePath).href;\n` +
-      `process.stderr.write('[openclaw-launcher] loading bundle via import(): ' + bundleUrl + '\\n');\n` +
+      `_log('loading bundle (' + _elapsed() + ')');\n` +
       `import(bundleUrl).then(() => {\n` +
-      `  process.stderr.write('[openclaw-launcher] import(gateway-bundle.mjs) ok (' + (Date.now() - t0) + 'ms)\\n');\n` +
+      `  _log('import ok (' + _elapsed() + ')');\n` +
       `  try { require('node:module').flushCompileCache(); } catch (_) {}\n` +
       `}).catch((err) => {\n` +
-      `  process.stderr.write('[openclaw-launcher] import(gateway-bundle.mjs) failed (' + (Date.now() - t0) + 'ms): ' + (err.stack || err) + '\\n');\n` +
+      `  _log('import failed (' + _elapsed() + '): ' + (err.stack || err));\n` +
       `  process.exit(1);\n` +
       `});\n`;
 
