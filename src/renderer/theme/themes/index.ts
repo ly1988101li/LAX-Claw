@@ -1,5 +1,7 @@
 import type { ThemeDefinition } from './types';
 
+import { classicLight } from './classic-light';
+import { classicDark }  from './classic-dark';
 import { dawn } from './dawn';
 import { daylight } from './daylight';
 import { paper } from './paper';
@@ -15,6 +17,8 @@ import { cyber } from './cyber';
 
 /** All built-in themes. First entry is the default. */
 export const allThemes: ThemeDefinition[] = [
+  classicLight,
+  classicDark,
   dawn,
   daylight,
   paper,

@@ -17,7 +17,7 @@ class ThemeService {
     }
     this.manager = new ThemeManager(allThemes, {
       storageKey: 'lobster-theme-id',
-      defaultTheme: 'dawn',
+      defaultTheme: 'classic-light',
       followSystem: false,
     });
   }
@@ -51,7 +51,7 @@ class ThemeService {
 
   // 设置主题 — accepts legacy 'light'|'dark'|'system' OR a theme ID
   setTheme(theme: ThemeType | string): void {
-    console.log(`[ThemeService] setTheme: ${theme}`);
+    console.debug(`[ThemeService] setTheme: ${theme}`);
     if (theme === 'light' || theme === 'dark' || theme === 'system') {
       this.currentTheme = theme;
       if (theme === 'system') {
@@ -78,6 +78,12 @@ class ThemeService {
     if (def) {
       this.currentTheme = def.meta.appearance as ThemeType;
     }
+  }
+
+  // 还原主题（用于取消操作）：直接 apply 指定 ID 并还原 mode，跳过 applyByAppearance 的 localStorage 读取
+  restoreTheme(id: string, mode: ThemeType): void {
+    void this.manager.setTheme(id);
+    this.currentTheme = mode;
   }
 
   // 获取当前主题 (legacy API)
