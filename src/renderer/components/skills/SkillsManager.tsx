@@ -531,7 +531,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
         </p>
       </div>
 
-      {skillActionError && (
+      {skillActionError && !isRemoteImportOpen && (
         <ErrorMessage
           message={skillActionError}
           onClose={() => setSkillActionError('')}
@@ -1138,14 +1138,14 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
       , document.body)}
 
       {isRemoteImportOpen && createPortal(
-        <Modal onClose={() => setIsRemoteImportOpen(false)} overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/60" className="w-full max-w-md mx-4 rounded-2xl bg-surface border border-border shadow-2xl p-6">
+        <Modal onClose={() => { setIsRemoteImportOpen(false); setSkillActionError(''); }} overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/60" className="w-full max-w-md mx-4 rounded-2xl bg-surface border border-border shadow-2xl p-6">
             <div className="flex items-start justify-between">
               <div className="text-lg font-semibold text-foreground">
                 {i18nService.t('remoteImportTitle')}
               </div>
               <button
                 type="button"
-                onClick={() => setIsRemoteImportOpen(false)}
+                onClick={() => { setIsRemoteImportOpen(false); setSkillActionError(''); }}
                 className="p-1.5 rounded-lg text-secondary hover:text-foreground hover:bg-surface-raised transition-colors"
               >
                 <XMarkIcon className="h-5 w-5" />
