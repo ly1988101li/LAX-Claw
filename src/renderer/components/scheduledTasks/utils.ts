@@ -1,6 +1,6 @@
 import cronstrue from 'cronstrue/i18n';
-import { i18nService } from '../../services/i18n';
 import { PlatformRegistry } from '../../../shared/platform';
+import { i18nService } from '../../services/i18n';
 import type {
   ScheduledTask,
   ScheduledTaskDelivery,

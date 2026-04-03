@@ -1,18 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
-import { RootState } from '../../store';
-import { scheduledTaskService } from '../../services/scheduledTask';
-import { i18nService } from '../../services/i18n';
+import { PlatformRegistry } from '@shared/platform';
 import type { Model } from '../../store/slices/modelSlice';
+import { RootState } from '../../store';
+import { i18nService } from '../../services/i18n';
+import { scheduledTaskService } from '../../services/scheduledTask';
 import type {
   ScheduledTask,
   ScheduledTaskChannelOption,
   ScheduledTaskConversationOption,
   ScheduledTaskInput,
 } from '../../../scheduledTask/types';
-import { formatScheduleLabel, type PlanType, scheduleToPlanInfo } from './utils';
-import { PlatformRegistry } from '@shared/platform';
 import ModelSelector from '../ModelSelector';
+import { formatScheduleLabel, type PlanType, scheduleToPlanInfo } from './utils';
 import { ProviderRegistry, OpenClawProviderId } from '@shared/providers/constants';
 
 function toOpenClawModelRef(model: { id: string; providerKey?: string; isServerModel?: boolean }): string {
