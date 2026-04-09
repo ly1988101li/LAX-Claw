@@ -972,6 +972,7 @@ export class OpenClawConfigSync {
       },
       cron: {
         enabled: true,
+        skipMissedJobs: coworkConfig.skipMissedJobs === true,
         maxConcurrentRuns: 3,
         sessionRetention: '7d',
       },
