@@ -430,6 +430,11 @@ export class OpenClawEngineManager extends EventEmitter {
       // regions with slow external API access.  See openclaw/openclaw#60116.
       // Requires the v2026.4.5 source patch (scripts/patches/v2026.4.5/).
       OPENCLAW_SKIP_MODEL_PRICING: '1',
+      // Disable Bonjour/mDNS LAN discovery advertising.  LobsterAI is a
+      // desktop app with a loopback-only gateway — LAN service broadcast is
+      // unnecessary and its watchdog can flood stderr with re-advertise
+      // warnings on Windows.  See openclaw/openclaw#33609, #63153.
+      OPENCLAW_DISABLE_BONJOUR: '1',
       // Enable debug-level logging so gateway emits phase-level detail during startup.
       OPENCLAW_LOG_LEVEL: 'debug',
       // Enable V8 compile cache for both CJS and ESM modules.

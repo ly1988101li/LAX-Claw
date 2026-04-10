@@ -1052,6 +1052,11 @@ export class OpenClawConfigSync {
                   const thirdPartyDir = findThirdPartyExtensionsDir();
                   return thirdPartyDir ? { load: { paths: [thirdPartyDir] } } : {};
                 })()),
+                // Deny list cleared — unused bundled plugins are physically removed
+                // from dist/extensions/ at build time (see prune-openclaw-runtime.cjs).
+                // OpenClaw validates deny IDs against discovered plugins, so denying
+                // a removed plugin causes "Config invalid: plugin not found" errors.
+                deny: [],
                 entries: pluginEntries,
               },
             }
