@@ -968,7 +968,6 @@ export class OpenClawEngineManager extends EventEmitter {
       `_log('loading bundle (' + _elapsed() + ')');\n` +
       `import(bundleUrl).then(() => {\n` +
       `  _log('import ok (' + _elapsed() + ')');\n` +
-      `  try { require('node:module').flushCompileCache(); } catch (_) {}\n` +
       `}).catch((err) => {\n` +
       `  _log('import failed (' + _elapsed() + '): ' + (err.stack || err));\n` +
       `  process.exit(1);\n` +

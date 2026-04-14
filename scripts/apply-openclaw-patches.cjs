@@ -66,6 +66,7 @@ console.log(`[apply-openclaw-patches] Applying patches for openclaw ${openclawVe
 // This removes stale patches left by a different LobsterAI branch that may have
 // applied different patches for the same openclaw version.
 try {
+  execFileSync('git', ['reset', 'HEAD', '.'], { cwd: openclawSrc, stdio: 'pipe' });
   execFileSync('git', ['checkout', '.'], { cwd: openclawSrc, stdio: 'pipe' });
   execFileSync('git', ['clean', '-fd'], { cwd: openclawSrc, stdio: 'pipe' });
   console.log('[apply-openclaw-patches] Reset openclaw source to clean state before patching.');
