@@ -338,6 +338,7 @@ const PROVIDER_DEFINITIONS = [
   {
     id: ProviderName.Qianfan,
     label: 'Qianfan',
+    apiKeyUrl: 'https://console.bce.baidu.com/qianfan/ais/console/apiKey',
     openClawProviderId: OpenClawProviderId.Qianfan,
     defaultBaseUrl: 'https://qianfan.baidubce.com/v2',
     defaultApiFormat: ApiFormat.OpenAI,
