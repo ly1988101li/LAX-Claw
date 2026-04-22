@@ -159,18 +159,19 @@
   System::Call 'Kernel32::SetEnvironmentVariable(t "ELECTRON_RUN_AS_NODE", t "")i'
 
   ; ─── Windows Defender Exclusion (optional, best-effort) ───
-  ; Only the three large resource subdirectories are excluded (not the full
+  ; Only specific resource subdirectories are excluded (not the full
   ; $INSTDIR root or $APPDATA) to keep the exclusion scope minimal:
-  ;   cfmind\     — ~3000 JS/native files, primary startup bottleneck
-  ;   python-win\ — bundled Python interpreter
-  ;   SKILLs\     — skill scripts
+  ;   cfmind\              — ~3000 JS/native files, primary startup bottleneck
+  ;   python-win\          — bundled Python interpreter
+  ;   SKILLs\              — skill scripts
+  ;   app.asar.unpacked\   — native modules loaded at startup (better-sqlite3, node-nim, npm)
   ;
   ; This is a best-effort optimization:
   ; - Requires admin privileges (already elevated for installation)
   ; - Silently skipped if Defender is not running or policy disallows it
   ; - Common practice for developer tools (VS Code, Docker Desktop, etc.)
 
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "try { Add-MpPreference -ExclusionPath $\"$INSTDIR\resources\cfmind$\",$\"$INSTDIR\resources\python-win$\",$\"$INSTDIR\resources\SKILLs$\" -ErrorAction Stop; Write-Output ok } catch { Write-Output skip }"'
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "try { Add-MpPreference -ExclusionPath $\"$INSTDIR\resources\cfmind$\",$\"$INSTDIR\resources\python-win$\",$\"$INSTDIR\resources\SKILLs$\",$\"$INSTDIR\resources\app.asar.unpacked$\" -ErrorAction Stop; Write-Output ok } catch { Write-Output skip }"'
   Pop $0
   Pop $1
   FileWrite $2 "defender-exclusion: exit=$0 result=$1$\r$\n"
@@ -208,7 +209,7 @@
 !macro customUnInstall
   ; ─── Remove Windows Defender Exclusion on uninstall ───
   ; Clean up the exclusions we added during installation.
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "try { Remove-MpPreference -ExclusionPath $\"$INSTDIR\resources\cfmind$\",$\"$INSTDIR\resources\python-win$\",$\"$INSTDIR\resources\SKILLs$\" -ErrorAction SilentlyContinue } catch {}"'
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "try { Remove-MpPreference -ExclusionPath $\"$INSTDIR\resources\cfmind$\",$\"$INSTDIR\resources\python-win$\",$\"$INSTDIR\resources\SKILLs$\",$\"$INSTDIR\resources\app.asar.unpacked$\" -ErrorAction SilentlyContinue } catch {}"'
   Pop $0
   Pop $1
 !macroend
