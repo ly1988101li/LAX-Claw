@@ -239,6 +239,24 @@ export class McpBridgeServer {
   }
 
   private async handleMcpExecute(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+    // Abort in-flight MCP tool calls when the gateway drops the HTTP connection
+    // (e.g. after chat.abort).  This prevents zombie 60-second MCP timeouts from
+    // keeping the gateway run active and blocking new user messages.
+    //
+    // Listen on `res` (ServerResponse), NOT `req` (IncomingMessage).
+    // `req` is a Readable stream that emits `close` after the body is consumed
+    // (auto-destroy via nextTick, which runs before the Promise microtask from
+    // readBody), causing the signal to be aborted before callTool even starts.
+    // `res.close` fires when the underlying socket disconnects; we only abort
+    // if the response hasn't been fully sent yet (i.e. a premature disconnect).
+    const abortController = new AbortController();
+    const onClose = () => {
+      if (!res.writableFinished) {
+        abortController.abort();
+      }
+    };
+    res.on('close', onClose);
+
     try {
       const body = await this.readBody(req);
       const { server, tool, args } = JSON.parse(body) as {
@@ -256,7 +274,7 @@ export class McpBridgeServer {
       }
 
       const t0 = Date.now();
-      const result = await this.mcpManager.callTool(server, tool, args || {});
+      const result = await this.mcpManager.callTool(server, tool, args || {}, { signal: abortController.signal });
       const contentPreview = serializeToolContentForLog(result.content);
       const textPreview = getToolTextPreview(result.content);
       log('INFO', `Execute completed for server="${server}" tool="${tool}" in ${Date.now() - t0}ms with isError=${result.isError}. Result=${contentPreview}`);
@@ -264,16 +282,22 @@ export class McpBridgeServer {
         log('WARN', `Execute completed for server="${server}" tool="${tool}" with transport-style error text but isError=false. Result text="${textPreview}"`);
       }
 
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(result));
+      if (!res.writableEnded) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      }
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : String(error);
       log('ERROR', `Request handling error: ${errMsg}`);
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        content: [{ type: 'text', text: `Bridge error: ${errMsg}` }],
-        isError: true,
-      }));
+      if (!res.writableEnded) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          content: [{ type: 'text', text: `Bridge error: ${errMsg}` }],
+          isError: true,
+        }));
+      }
+    } finally {
+      res.removeListener('close', onClose);
     }
   }
 

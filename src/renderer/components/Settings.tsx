@@ -16,6 +16,7 @@ import { i18nService, LanguageType } from '../services/i18n';
 import { imService } from '../services/im';
 import { themeService } from '../services/theme';
 import { selectCoworkConfig } from '../store/selectors/coworkSelectors';
+import type { RootState } from '../store';
 import { setAvailableModels } from '../store/slices/modelSlice';
 import type {
   CoworkAgentEngine,
@@ -121,9 +122,9 @@ interface ProvidersImportPayload {
 }
 
 
-const providerRequiresApiKey = (provider: ProviderType) => provider !== 'ollama' && provider !== 'github-copilot';
+const providerRequiresApiKey = (provider: ProviderType) => provider !== 'ollama' && provider !== 'lm-studio' && provider !== 'github-copilot';
 const hasProviderAuthConfigured = (provider: ProviderType, config: ProviderConfig): boolean => {
-  if (provider === 'ollama') {
+  if (provider === 'ollama' || provider === 'lm-studio') {
     return true;
   }
 
@@ -689,11 +690,13 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
     }
   }, []);
 
+  const authUser = useSelector((state: RootState) => state.auth.user);
+
   const handleCheckUpdate = useCallback(async () => {
     if (updateCheckStatus === 'checking' || !appVersion) return;
     setUpdateCheckStatus('checking');
     try {
-      const result = await window.electron.appUpdate.checkNow({ manual: true });
+      const result = await window.electron.appUpdate.checkNow({ manual: true, userId: authUser?.yid });
       if (!result.success) {
         throw new Error(result.error || 'Update check failed');
       }
@@ -731,7 +734,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
         updateCheckTimerRef.current = null;
       }, 3000);
     }
-  }, [appVersion, updateCheckStatus, onUpdateFound]);
+  }, [appVersion, authUser, updateCheckStatus, onUpdateFound]);
 
   const updateButtonLabel = useMemo(() => {
     if (
@@ -1019,6 +1022,17 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
             ...prev,
             ollama: {
               ...prev.ollama,
+              enabled: true,
+              apiKey: config.api.key,
+              baseUrl: config.api.baseUrl
+            }
+          }));
+        } else if (normalizedApiBaseUrl.includes('lm-studio') || normalizedApiBaseUrl.includes(':1234')) {
+          setActiveProvider('lm-studio');
+          setProviders(prev => ({
+            ...prev,
+            'lm-studio': {
+              ...prev['lm-studio'],
               enabled: true,
               apiKey: config.api.key,
               baseUrl: config.api.baseUrl
@@ -1931,10 +1945,10 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
   const handleSaveNewModel = () => {
     const modelId = newModelId.trim();
 
-    if (activeProvider === 'ollama') {
-      // For Ollama, only the model name (stored as modelId) is required
+    if (activeProvider === 'ollama' || activeProvider === 'lm-studio') {
+      // For Ollama/LM Studio, only the model name (stored as modelId) is required
       if (!modelId) {
-        setModelFormError(i18nService.t('ollamaModelNameRequired'));
+        setModelFormError(i18nService.t(activeProvider === 'lm-studio' ? 'lmStudioModelNameRequired' : 'ollamaModelNameRequired'));
         return;
       }
     } else {
@@ -1946,7 +1960,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
     }
 
     // For Ollama, auto-fill display name from modelId if not provided
-    const modelName = activeProvider === 'ollama'
+    const modelName = activeProvider === 'ollama' || activeProvider === 'lm-studio'
       ? (newModelName.trim() && newModelName.trim() !== modelId ? newModelName.trim() : modelId)
       : newModelName.trim();
 
@@ -4452,11 +4466,11 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 )}
 
                 <div className="space-y-3">
-                  {activeProvider === 'ollama' ? (
+                  {(activeProvider === 'ollama' || activeProvider === 'lm-studio') ? (
                     <>
                       <div>
                         <label className="block text-xs font-medium text-secondary mb-1">
-                          {i18nService.t('ollamaModelName')}
+                          {i18nService.t(activeProvider === 'lm-studio' ? 'lmStudioModelName' : 'ollamaModelName')}
                         </label>
                         <input
                           autoFocus
@@ -4472,15 +4486,15 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                             }
                           }}
                           className="block w-full rounded-xl bg-surface-inset border-border border focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground px-3 py-2 text-xs"
-                          placeholder={i18nService.t('ollamaModelNamePlaceholder')}
+                          placeholder={i18nService.t(activeProvider === 'lm-studio' ? 'lmStudioModelNamePlaceholder' : 'ollamaModelNamePlaceholder')}
                         />
                         <p className="mt-1 text-[11px] text-muted">
-                          {i18nService.t('ollamaModelNameHint')}
+                          {i18nService.t(activeProvider === 'lm-studio' ? 'lmStudioModelNameHint' : 'ollamaModelNameHint')}
                         </p>
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-secondary mb-1">
-                          {i18nService.t('ollamaDisplayName')}
+                          {i18nService.t(activeProvider === 'lm-studio' ? 'lmStudioDisplayName' : 'ollamaDisplayName')}
                         </label>
                         <input
                           type="text"
@@ -4492,10 +4506,10 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                             }
                           }}
                           className="block w-full rounded-xl bg-surface-inset border-border border focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground px-3 py-2 text-xs"
-                          placeholder={i18nService.t('ollamaDisplayNamePlaceholder')}
+                          placeholder={i18nService.t(activeProvider === 'lm-studio' ? 'lmStudioDisplayNamePlaceholder' : 'ollamaDisplayNamePlaceholder')}
                         />
                         <p className="mt-1 text-[11px] text-muted">
-                          {i18nService.t('ollamaDisplayNameHint')}
+                          {i18nService.t(activeProvider === 'lm-studio' ? 'lmStudioDisplayNameHint' : 'ollamaDisplayNameHint')}
                         </p>
                       </div>
                     </>

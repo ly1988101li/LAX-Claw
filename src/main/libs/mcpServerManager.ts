@@ -36,6 +36,24 @@ interface ManagedMcpServer {
 
 const MAX_RECENT_STDERR_LINES = 20;
 
+/**
+ * Race a promise against an AbortSignal.  When the signal fires first the
+ * returned promise rejects with an Error whose message is `reason`.
+ * The original promise is NOT cancelled — it keeps running in the background
+ * but its result is discarded.
+ */
+function raceAbortSignal<T>(promise: Promise<T>, signal: AbortSignal, reason: string): Promise<T> {
+  if (signal.aborted) return Promise.reject(new Error(reason));
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(new Error(reason));
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(
+      (value) => { signal.removeEventListener('abort', onAbort); resolve(value); },
+      (err) => { signal.removeEventListener('abort', onAbort); reject(err); },
+    );
+  });
+}
+
 const log = (level: string, msg: string) => {
   const formatted = `[McpBridge:SDK][${level}] ${msg}`;
   if (level === 'ERROR') {
@@ -457,6 +475,7 @@ export class McpServerManager {
     serverName: string,
     toolName: string,
     args: Record<string, unknown>,
+    options?: { signal?: AbortSignal },
   ): Promise<{ content: Array<{ type: string; text?: string }>; isError: boolean }> {
     const server = this.servers.get(serverName);
     if (!server) {
@@ -466,11 +485,28 @@ export class McpServerManager {
       };
     }
 
+    if (options?.signal?.aborted) {
+      return {
+        content: [{ type: 'text', text: 'Tool execution aborted: request cancelled before start' }],
+        isError: true,
+      };
+    }
+
     try {
       const startedAt = Date.now();
       const argsPreview = serializeForLog(args);
       log('INFO', `Calling tool "${toolName}" on server "${serverName}" with arguments ${argsPreview}`);
-      const result = await server.client.callTool({ name: toolName, arguments: args });
+
+      // Race the tool call against the abort signal so that in-flight MCP calls
+      // return immediately when the gateway drops the HTTP connection (e.g. after chat.abort).
+      const toolPromise = server.client.callTool({ name: toolName, arguments: args });
+      let result: Awaited<typeof toolPromise>;
+      if (options?.signal) {
+        result = await raceAbortSignal(toolPromise, options.signal, `Tool "${toolName}" aborted`);
+      } else {
+        result = await toolPromise;
+      }
+
       const content = Array.isArray(result.content)
         ? (result.content as Array<{ type: string; text?: string }>)
         : [{ type: 'text', text: String(result.content) }];

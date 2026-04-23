@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('electron', {
     setConfig: (skillId: string, config: Record<string, string>) => ipcRenderer.invoke('skills:setConfig', skillId, config),
     testEmailConnectivity: (skillId: string, config: Record<string, string>) =>
       ipcRenderer.invoke('skills:testEmailConnectivity', skillId, config),
+    fetchMarketplace: () => ipcRenderer.invoke('skills:fetchMarketplace'),
     onChanged: (callback: () => void) => {
       const handler = () => callback();
       ipcRenderer.on('skills:changed', handler);
@@ -352,7 +353,7 @@ contextBridge.exposeInMainWorld('electron', {
   },
   appUpdate: {
     getState: () => ipcRenderer.invoke(AppUpdateIpc.GetState),
-    checkNow: (options?: { manual?: boolean }) => ipcRenderer.invoke(AppUpdateIpc.CheckNow, options),
+    checkNow: (options?: { manual?: boolean; userId?: string | null }) => ipcRenderer.invoke(AppUpdateIpc.CheckNow, options),
     retryDownload: () => ipcRenderer.invoke(AppUpdateIpc.RetryDownload),
     cancelDownload: () => ipcRenderer.invoke(AppUpdateIpc.CancelDownload),
     installReady: () => ipcRenderer.invoke(AppUpdateIpc.InstallReady),
@@ -438,6 +439,18 @@ contextBridge.exposeInMainWorld('electron', {
     deleteWecomInstance: (instanceId: string) => ipcRenderer.invoke('im:wecom:instance:delete', instanceId),
     setWecomInstanceConfig: (instanceId: string, config: any, options?: { syncGateway?: boolean }) =>
       ipcRenderer.invoke('im:wecom:instance:config:set', instanceId, config, options),
+
+    // Telegram Multi-Instance
+    addTelegramInstance: (name: string) => ipcRenderer.invoke('im:telegram:instance:add', name),
+    deleteTelegramInstance: (instanceId: string) => ipcRenderer.invoke('im:telegram:instance:delete', instanceId),
+    setTelegramInstanceConfig: (instanceId: string, config: any, options?: { syncGateway?: boolean }) =>
+      ipcRenderer.invoke('im:telegram:instance:config:set', instanceId, config, options),
+
+    // Discord Multi-Instance
+    addDiscordInstance: (name: string) => ipcRenderer.invoke('im:discord:instance:add', name),
+    deleteDiscordInstance: (instanceId: string) => ipcRenderer.invoke('im:discord:instance:delete', instanceId),
+    setDiscordInstanceConfig: (instanceId: string, config: any, options?: { syncGateway?: boolean }) =>
+      ipcRenderer.invoke('im:discord:instance:config:set', instanceId, config, options),
 
     // Event listeners
     onStatusChange: (callback: (status: any) => void) => {

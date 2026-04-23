@@ -263,6 +263,7 @@ interface IElectronAPI {
       skillId: string,
       config: Record<string, string>
     ) => Promise<{ success: boolean; result?: EmailConnectivityTestResult; error?: string }>;
+    fetchMarketplace: () => Promise<{ success: boolean; data?: string; error?: string }>;
     onChanged: (callback: () => void) => () => void;
   };
   mcp: {
@@ -422,7 +423,7 @@ interface IElectronAPI {
   };
   appUpdate: {
     getState: () => Promise<AppUpdateRuntimeState>;
-    checkNow: (options?: { manual?: boolean }) => Promise<AppUpdateCheckResult>;
+    checkNow: (options?: { manual?: boolean; userId?: string | null }) => Promise<AppUpdateCheckResult>;
     retryDownload: () => Promise<{ success: boolean; state: AppUpdateRuntimeState }>;
     cancelDownload: () => Promise<{ success: boolean; state: AppUpdateRuntimeState }>;
     installReady: () => Promise<{ success: boolean; state: AppUpdateRuntimeState; error?: string }>;
@@ -503,6 +504,12 @@ interface IElectronAPI {
     addWecomInstance: (name: string) => Promise<{ success: boolean; instance?: WecomInstanceConfig; error?: string }>;
     deleteWecomInstance: (instanceId: string) => Promise<{ success: boolean; error?: string }>;
     setWecomInstanceConfig: (instanceId: string, config: any, options?: { syncGateway?: boolean }) => Promise<{ success: boolean; error?: string }>;
+    addTelegramInstance: (name: string) => Promise<{ success: boolean; instance?: TelegramInstanceConfig; error?: string }>;
+    deleteTelegramInstance: (instanceId: string) => Promise<{ success: boolean; error?: string }>;
+    setTelegramInstanceConfig: (instanceId: string, config: any, options?: { syncGateway?: boolean }) => Promise<{ success: boolean; error?: string }>;
+    addDiscordInstance: (name: string) => Promise<{ success: boolean; instance?: DiscordInstanceConfig; error?: string }>;
+    deleteDiscordInstance: (instanceId: string) => Promise<{ success: boolean; error?: string }>;
+    setDiscordInstanceConfig: (instanceId: string, config: any, options?: { syncGateway?: boolean }) => Promise<{ success: boolean; error?: string }>;
     onStatusChange: (callback: (status: IMGatewayStatus) => void) => () => void;
     onMessageReceived: (callback: (message: IMMessage) => void) => () => void;
   };
@@ -562,8 +569,8 @@ interface IElectronAPI {
   };
   auth: {
     login: (loginUrl?: string) => Promise<{ success: boolean; error?: string }>;
-    exchange: (code: string) => Promise<{ success: boolean; user?: { userId: string; phone: string; nickname: string; avatarUrl: string }; quota?: { planName: string; subscriptionStatus: string; creditsLimit: number; creditsUsed: number; creditsRemaining: number }; error?: string }>;
-    getUser: () => Promise<{ success: boolean; user?: { userId: string; phone: string; nickname: string; avatarUrl: string }; quota?: { planName: string; subscriptionStatus: string; creditsLimit: number; creditsUsed: number; creditsRemaining: number } }>;
+    exchange: (code: string) => Promise<{ success: boolean; user?: import('../store/slices/authSlice').UserProfile; quota?: { planName: string; subscriptionStatus: string; creditsLimit: number; creditsUsed: number; creditsRemaining: number }; error?: string }>;
+    getUser: () => Promise<{ success: boolean; user?: import('../store/slices/authSlice').UserProfile; quota?: { planName: string; subscriptionStatus: string; creditsLimit: number; creditsUsed: number; creditsRemaining: number } }>;
     getQuota: () => Promise<{ success: boolean; quota?: { planName: string; subscriptionStatus: string; creditsLimit: number; creditsUsed: number; creditsRemaining: number } }>;
     logout: () => Promise<{ success: boolean }>;
     refreshToken: () => Promise<{ success: boolean; accessToken?: string }>;
@@ -684,9 +691,9 @@ interface EmailMultiInstanceStatus {
 interface IMGatewayConfig {
   dingtalk: DingTalkMultiInstanceConfig;
   feishu: FeishuMultiInstanceConfig;
-  telegram: TelegramOpenClawConfig;
+  telegram: TelegramMultiInstanceConfig;
   qq: QQMultiInstanceConfig;
-  discord: DiscordOpenClawConfig;
+  discord: DiscordMultiInstanceConfig;
   nim: NimMultiInstanceConfig;
   'netease-bee': NeteaseBeeChanConfig;
   wecom: WecomMultiInstanceConfig;
@@ -807,6 +814,24 @@ interface TelegramOpenClawConfig {
   webhookUrl: string;
   webhookSecret: string;
   debug: boolean;
+}
+
+interface TelegramInstanceConfig extends TelegramOpenClawConfig {
+  instanceId: string;
+  instanceName: string;
+}
+
+interface TelegramInstanceStatus extends TelegramGatewayStatus {
+  instanceId: string;
+  instanceName: string;
+}
+
+interface TelegramMultiInstanceConfig {
+  instances: TelegramInstanceConfig[];
+}
+
+interface TelegramMultiInstanceStatus {
+  instances: TelegramInstanceStatus[];
 }
 
 interface DiscordOpenClawGuildConfig {
@@ -988,8 +1013,8 @@ interface IMGatewayStatus {
   dingtalk: DingTalkMultiInstanceStatus;
   feishu: FeishuMultiInstanceStatus;
   qq: QQMultiInstanceStatus;
-  telegram: TelegramGatewayStatus;
-  discord: DiscordGatewayStatus;
+  telegram: TelegramMultiInstanceStatus;
+  discord: DiscordMultiInstanceStatus;
   nim: NimMultiInstanceStatus;
   'netease-bee': NeteaseBeeChanGatewayStatus;
   wecom: WecomMultiInstanceStatus;
@@ -1074,6 +1099,24 @@ interface DiscordGatewayStatus {
   botUsername: string | null;
   lastInboundAt: number | null;
   lastOutboundAt: number | null;
+}
+
+interface DiscordInstanceConfig extends DiscordOpenClawConfig {
+  instanceId: string;
+  instanceName: string;
+}
+
+interface DiscordInstanceStatus extends DiscordGatewayStatus {
+  instanceId: string;
+  instanceName: string;
+}
+
+interface DiscordMultiInstanceConfig {
+  instances: DiscordInstanceConfig[];
+}
+
+interface DiscordMultiInstanceStatus {
+  instances: DiscordInstanceStatus[];
 }
 
 interface NimGatewayStatus {

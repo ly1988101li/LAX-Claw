@@ -9,7 +9,11 @@ import type {
   DingTalkInstanceConfig,
   DingTalkMultiInstanceConfig,
   DingTalkOpenClawConfig,
+  DiscordInstanceConfig,
+  DiscordMultiInstanceConfig,
   DiscordOpenClawConfig,
+  EmailInstanceConfig,
+  EmailMultiInstanceConfig,
   FeishuInstanceConfig,
   FeishuMultiInstanceConfig,
   FeishuOpenClawConfig,
@@ -24,13 +28,13 @@ import type {
   QQInstanceConfig,
   QQMultiInstanceConfig,
   QQOpenClawConfig,
+  TelegramInstanceConfig,
+  TelegramMultiInstanceConfig,
   TelegramOpenClawConfig,
   WecomInstanceConfig,
   WecomMultiInstanceConfig,
   WecomOpenClawConfig,
   WeixinOpenClawConfig,
-  EmailInstanceConfig,
-  EmailMultiInstanceConfig,
 } from '../../types/im';
 import {
   DEFAULT_IM_CONFIG,
@@ -110,11 +114,30 @@ const imSlice = createSlice({
         i => i.instanceId !== action.payload
       );
     },
+    /** @deprecated Use setTelegramInstanceConfig instead */
     setTelegramOpenClawConfig: (state, action: PayloadAction<Partial<TelegramOpenClawConfig>>) => {
-      state.config.telegram = {
-        ...state.config.telegram,
-        ...action.payload,
-      };
+      const first = state.config.telegram.instances[0];
+      if (first) {
+        Object.assign(first, action.payload);
+      }
+    },
+    setTelegramInstances: (state, action: PayloadAction<TelegramInstanceConfig[]>) => {
+      state.config.telegram = { instances: action.payload };
+    },
+    setTelegramMultiInstanceConfig: (state, action: PayloadAction<TelegramMultiInstanceConfig>) => {
+      state.config.telegram = action.payload;
+    },
+    setTelegramInstanceConfig: (state, action: PayloadAction<{ instanceId: string; config: Partial<TelegramOpenClawConfig> }>) => {
+      const inst = state.config.telegram.instances.find(i => i.instanceId === action.payload.instanceId);
+      if (inst) Object.assign(inst, action.payload.config);
+    },
+    addTelegramInstance: (state, action: PayloadAction<TelegramInstanceConfig>) => {
+      state.config.telegram.instances.push(action.payload);
+    },
+    removeTelegramInstance: (state, action: PayloadAction<string>) => {
+      state.config.telegram.instances = state.config.telegram.instances.filter(
+        i => i.instanceId !== action.payload
+      );
     },
     /** @deprecated Use setQQInstanceConfig instead */
     setQQConfig: (state, action: PayloadAction<Partial<QQOpenClawConfig>>) => {
@@ -142,8 +165,30 @@ const imSlice = createSlice({
         i => i.instanceId !== action.payload
       );
     },
+    /** @deprecated Use setDiscordInstanceConfig instead */
     setDiscordConfig: (state, action: PayloadAction<Partial<DiscordOpenClawConfig>>) => {
-      state.config.discord = { ...state.config.discord, ...action.payload };
+      const first = state.config.discord.instances[0];
+      if (first) {
+        Object.assign(first, action.payload);
+      }
+    },
+    setDiscordInstances: (state, action: PayloadAction<DiscordInstanceConfig[]>) => {
+      state.config.discord = { instances: action.payload };
+    },
+    setDiscordMultiInstanceConfig: (state, action: PayloadAction<DiscordMultiInstanceConfig>) => {
+      state.config.discord = action.payload;
+    },
+    setDiscordInstanceConfig: (state, action: PayloadAction<{ instanceId: string; config: Partial<DiscordOpenClawConfig> }>) => {
+      const inst = state.config.discord.instances.find(i => i.instanceId === action.payload.instanceId);
+      if (inst) Object.assign(inst, action.payload.config);
+    },
+    addDiscordInstance: (state, action: PayloadAction<DiscordInstanceConfig>) => {
+      state.config.discord.instances.push(action.payload);
+    },
+    removeDiscordInstance: (state, action: PayloadAction<string>) => {
+      state.config.discord.instances = state.config.discord.instances.filter(
+        i => i.instanceId !== action.payload
+      );
     },
     /** @deprecated Use setNimInstanceConfig instead */
     setNimConfig: (state, action: PayloadAction<Partial<NimConfig>>) => {
@@ -256,6 +301,11 @@ export const {
   addFeishuInstance,
   removeFeishuInstance,
   setTelegramOpenClawConfig,
+  setTelegramInstances,
+  setTelegramMultiInstanceConfig,
+  setTelegramInstanceConfig,
+  addTelegramInstance,
+  removeTelegramInstance,
   setQQConfig,
   setQQInstances,
   setQQMultiInstanceConfig,
@@ -263,6 +313,11 @@ export const {
   addQQInstance,
   removeQQInstance,
   setDiscordConfig,
+  setDiscordInstances,
+  setDiscordMultiInstanceConfig,
+  setDiscordInstanceConfig,
+  addDiscordInstance,
+  removeDiscordInstance,
   setNimConfig,
   setNimInstances,
   setNimMultiInstanceConfig,

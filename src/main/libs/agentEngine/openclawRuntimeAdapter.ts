@@ -1411,13 +1411,18 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
       if (attachments) {
         console.log('[OpenClawRuntime] chat.send with attachments:', attachments.length, 'images,', attachments.map(a => ({ type: a.type, mimeType: a.mimeType, contentLength: a.content?.length ?? 0 })));
       }
+      const chatSendStartMs = Date.now();
       const sendResult = await client.request<Record<string, unknown>>('chat.send', {
         sessionKey,
         message: outboundMessage,
         deliver: false,
         idempotencyKey: runId,
         ...(attachments ? { attachments } : {}),
-      });
+      }, { timeoutMs: 90_000 });
+      const chatSendElapsedMs = Date.now() - chatSendStartMs;
+      if (chatSendElapsedMs > 10_000) {
+        console.warn(`[OpenClawRuntime] chat.send took ${chatSendElapsedMs}ms — gateway may still be initializing`);
+      }
       const returnedRunId = typeof sendResult?.runId === 'string' ? sendResult.runId.trim() : '';
       if (returnedRunId) {
         this.bindRunIdToTurn(sessionId, returnedRunId);
@@ -3559,24 +3564,10 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
           return;
         }
 
-        if (isChannel) {
-          canonicalText = extractCurrentTurnAssistantText(history.messages);
-        } else {
-          for (let index = history.messages.length - 1; index >= 0; index -= 1) {
-            const message = history.messages[index];
-            if (!isRecord(message)) continue;
-            const role = typeof message.role === 'string' ? message.role.trim().toLowerCase() : '';
-            if (role !== 'assistant') continue;
-            canonicalText = extractMessageText(message).trim();
-            if (canonicalText && shouldSuppressHeartbeatText('assistant', canonicalText)) {
-              canonicalText = '';
-              continue;
-            }
-            if (canonicalText) {
-              break;
-            }
-          }
-        }
+        // Use turn-aware extraction for ALL session types.
+        // The previous non-channel backward scan could return stale assistant text
+        // from a prior turn when the gateway rejected the current run (empty final).
+        canonicalText = extractCurrentTurnAssistantText(history.messages);
 
         if (canonicalText) {
           break;

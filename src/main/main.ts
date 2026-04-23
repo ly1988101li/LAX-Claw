@@ -48,7 +48,7 @@ import { saveCoworkApiConfig } from './libs/coworkConfigStore';
 import { getCoworkLogPath } from './libs/coworkLogger';
 import { registerProxyTokenRefresher, startCoworkOpenAICompatProxy, stopCoworkOpenAICompatProxy } from './libs/coworkOpenAICompatProxy';
 import { generateSessionTitle, probeCoworkModelReadiness } from './libs/coworkUtil';
-import { getServerApiBaseUrl, refreshEndpointsTestMode } from './libs/endpoints';
+import { getServerApiBaseUrl, getSkillStoreUrl, refreshEndpointsTestMode } from './libs/endpoints';
 import { mergeEnterpriseOpenclawConfig, resolveEnterpriseConfigPath, syncEnterpriseConfig } from './libs/enterpriseConfigSync';
 import { exportLogsZip } from './libs/logExport';
 import { McpBridgeServer } from './libs/mcpBridgeServer';
@@ -995,11 +995,11 @@ const getOpenClawConfigSync = (): OpenClawConfigSync => {
       isEnterprise: () => !!getStore().get('enterprise_config'),
       getOpenClawSessionPolicy: () => loadOpenClawSessionPolicyConfig(getStore()),
       getSkillsList: () => getSkillManager().listSkills().map(s => ({ id: s.id, enabled: s.enabled })),
-      getTelegramOpenClawConfig: () => {
+      getTelegramInstances: () => {
         try {
-          return getIMGatewayManager()?.getConfig()?.telegram ?? null;
+          return getIMGatewayManager().getIMStore().getTelegramInstances();
         } catch {
-          return null;
+          return [];
         }
       },
       getDingTalkInstances: () => {
@@ -1072,11 +1072,11 @@ const getOpenClawConfigSync = (): OpenClawConfigSync => {
           return null;
         }
       },
-      getDiscordOpenClawConfig: () => {
+      getDiscordInstances: () => {
         try {
-          return getIMGatewayManager()?.getConfig()?.discord ?? null;
+          return getIMGatewayManager()?.getIMStore()?.getDiscordInstances() ?? [];
         } catch {
-          return null;
+          return [];
         }
       },
       getMcpBridgeConfig: (): McpBridgeConfig | null => {
@@ -1981,7 +1981,7 @@ if (!gotTheLock) {
       refreshEndpointsTestMode(getStore());
       const syncResult = await syncOpenClawConfig({
         reason: 'app-config-change',
-        restartGatewayIfRunning: false,
+        restartGatewayIfRunning: true,
       });
       if (!syncResult.success) {
         console.error('[OpenClaw] Failed to sync config after app_config update:', syncResult.error);
@@ -2053,6 +2053,9 @@ if (!gotTheLock) {
           { archiveName: 'cowork.log', filePath: getCoworkLogPath() },
           { archiveName: 'gateway.log', filePath: manager.getGatewayLogPath() },
           ...getRecentOpenClawDailyLogEntries(manager.getOpenClawDailyLogDir()),
+          ...(process.platform === 'win32'
+            ? [{ archiveName: 'install-timing.log', filePath: path.join(app.getPath('appData'), 'LobsterAI', 'install-timing.log') }]
+            : []),
         ],
       });
 
@@ -2276,6 +2279,7 @@ if (!gotTheLock) {
         return { success: false, error: body.message || 'Exchange failed' };
       }
       saveAuthTokens(body.data.accessToken, body.data.refreshToken);
+      console.log('[Auth] exchange user data:', JSON.stringify(body.data.user));
       return { success: true, user: body.data.user, quota: normalizeQuota(body.data.quota) };
     } catch (error) {
       console.error('[Auth] exchange failed:', error);
@@ -2302,6 +2306,7 @@ if (!gotTheLock) {
           quota = normalizeQuota(quotaBody.data);
         }
       }
+      console.log('[Auth] getUser profile data:', JSON.stringify(profileBody.data));
       return { success: true, user: profileBody.data, quota };
     } catch {
       return { success: false };
@@ -2404,6 +2409,11 @@ if (!gotTheLock) {
       if (data.code !== 0) return { success: false };
       // Cache server model metadata for use in OpenClaw config sync (supportsImage, etc.)
       updateServerModelMetadata(data.data);
+      // Re-sync so the gateway picks up the correct supportsImage values for server models.
+      // The startup sync runs before this IPC call, so the cache was empty then.
+      // restartGatewayIfRunning:true ensures the gateway restarts only when the config
+      // actually changed; the deferred-restart mechanism keeps active sessions safe.
+      syncOpenClawConfig({ reason: 'server-models-updated', restartGatewayIfRunning: false }).catch(() => {});
       return { success: true, models: data.data };
     } catch (e) {
       console.error('[Auth:getModels] Error:', e);
@@ -2490,6 +2500,33 @@ if (!gotTheLock) {
     config: Record<string, string>
   ) => {
     return getSkillManager().testEmailConnectivity(skillId, config);
+  });
+
+  ipcMain.handle('skills:fetchMarketplace', async () => {
+    const url = getSkillStoreUrl();
+    console.log(`[SkillMarketplace] fetching from: ${url}`);
+    try {
+      const https = await import('https');
+      const data = await new Promise<string>((resolve, reject) => {
+        const req = https.get(url, { timeout: 10000 }, (res) => {
+          if (res.statusCode !== 200) {
+            reject(new Error(`HTTP ${res.statusCode}`));
+            res.resume();
+            return;
+          }
+          let body = '';
+          res.setEncoding('utf8');
+          res.on('data', (chunk: string) => { body += chunk; });
+          res.on('end', () => resolve(body));
+          res.on('error', reject);
+        });
+        req.on('error', reject);
+        req.on('timeout', () => { req.destroy(); reject(new Error('Request timeout')); });
+      });
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to fetch skill marketplace' };
+    }
   });
 
   ipcMain.handle('openclaw:engine:getStatus', async () => {
@@ -4321,6 +4358,106 @@ if (!gotTheLock) {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to set WeCom instance config',
+      };
+    }
+  });
+
+  // Telegram Multi-Instance handlers
+  ipcMain.handle('im:telegram:instance:add', async (_event, name: string) => {
+    try {
+      const instanceId = crypto.randomUUID();
+      const { DEFAULT_TELEGRAM_OPENCLAW_CONFIG: defaults } = await import('./im/types');
+      const instance = {
+        ...defaults,
+        instanceId,
+        instanceName: name || 'Telegram Bot',
+      };
+      getIMGatewayManager().getIMStore().setTelegramInstanceConfig(instanceId, instance);
+      return { success: true, instance };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to add Telegram instance',
+      };
+    }
+  });
+
+  ipcMain.handle('im:telegram:instance:delete', async (_event, instanceId: string) => {
+    try {
+      getIMGatewayManager().getIMStore().deleteTelegramInstance(instanceId);
+      if (getOpenClawEngineManager().getStatus().phase === 'running') {
+        scheduleImConfigSync();
+      }
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to delete Telegram instance',
+      };
+    }
+  });
+
+  ipcMain.handle('im:telegram:instance:config:set', async (_event, instanceId: string, config: any, options?: { syncGateway?: boolean }) => {
+    try {
+      getIMGatewayManager().getIMStore().setTelegramInstanceConfig(instanceId, config);
+      if (options?.syncGateway && getOpenClawEngineManager().getStatus().phase === 'running') {
+        scheduleImConfigSync();
+      }
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to set Telegram instance config',
+      };
+    }
+  });
+
+  // Discord Multi-Instance handlers
+  ipcMain.handle('im:discord:instance:add', async (_event, name: string) => {
+    try {
+      const instanceId = crypto.randomUUID();
+      const { DEFAULT_DISCORD_OPENCLAW_CONFIG: defaults } = await import('./im/types');
+      const instance = {
+        ...defaults,
+        instanceId,
+        instanceName: name || 'Discord Bot',
+      };
+      getIMGatewayManager().getIMStore().setDiscordInstanceConfig(instanceId, instance);
+      return { success: true, instance };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to add Discord instance',
+      };
+    }
+  });
+
+  ipcMain.handle('im:discord:instance:delete', async (_event, instanceId: string) => {
+    try {
+      getIMGatewayManager().getIMStore().deleteDiscordInstance(instanceId);
+      if (getOpenClawEngineManager().getStatus().phase === 'running') {
+        scheduleImConfigSync();
+      }
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to delete Discord instance',
+      };
+    }
+  });
+
+  ipcMain.handle('im:discord:instance:config:set', async (_event, instanceId: string, config: any, options?: { syncGateway?: boolean }) => {
+    try {
+      getIMGatewayManager().getIMStore().setDiscordInstanceConfig(instanceId, config);
+      if (options?.syncGateway && getOpenClawEngineManager().getStatus().phase === 'running') {
+        scheduleImConfigSync();
+      }
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to set Discord instance config',
       };
     }
   });
