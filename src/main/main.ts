@@ -80,7 +80,7 @@ import { ensurePythonRuntimeReady } from './libs/pythonRuntime';
 import { SqliteBackupManager } from './libs/sqliteBackup/sqliteBackupManager';
 import {
   applySystemProxyEnv,
-  resolveSystemProxyUrl,
+  resolveSystemProxyUrlForTargets,
   restoreOriginalProxyEnv,
   setSystemProxyEnabled,
 } from './libs/systemProxy';
@@ -1837,13 +1837,13 @@ const updateTitleBarOverlay = () => {
 };
 
 const applyProxyPreference = async (useSystemProxy: boolean): Promise<void> => {
+  setSystemProxyEnabled(useSystemProxy);
+
   try {
     await session.defaultSession.setProxy({ mode: useSystemProxy ? 'system' : 'direct' });
   } catch (error) {
     console.error('[Main] Failed to apply session proxy mode:', error);
   }
-
-  setSystemProxyEnabled(useSystemProxy);
 
   if (!useSystemProxy) {
     restoreOriginalProxyEnv();
@@ -1851,11 +1851,11 @@ const applyProxyPreference = async (useSystemProxy: boolean): Promise<void> => {
     return;
   }
 
-  const proxyUrl = await resolveSystemProxyUrl('https://openrouter.ai');
+  const { proxyUrl, targetUrl } = await resolveSystemProxyUrlForTargets();
   applySystemProxyEnv(proxyUrl);
 
   if (proxyUrl) {
-    console.log('[Main] System proxy enabled for process env:', proxyUrl);
+    console.log(`[Main] System proxy enabled for process env via ${targetUrl}:`, proxyUrl);
   } else {
     console.warn('[Main] System proxy mode enabled, but no proxy endpoint was resolved (DIRECT).');
   }
