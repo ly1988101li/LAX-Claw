@@ -10,7 +10,7 @@ import path from 'path';
 import { ensureElectronNodeShim, getElectronNodeRuntimePath, getSkillsRoot } from './coworkUtil';
 import { cleanupStaleThirdPartyPluginsFromBundledDir, listLocalOpenClawExtensionIds,syncLocalOpenClawExtensionsIntoRuntime } from './openclawLocalExtensions';
 import { appendPythonRuntimeToEnv } from './pythonRuntime';
-import { isSystemProxyEnabled, resolveSystemProxyUrl } from './systemProxy';
+import { isSystemProxyEnabled, resolveSystemProxyUrlForTargets } from './systemProxy';
 
 type GatewayProcess = UtilityProcess | ChildProcess;
 
@@ -516,13 +516,13 @@ export class OpenClawEngineManager extends EventEmitter {
     }
 
     if (isSystemProxyEnabled()) {
-      const proxyUrl = await resolveSystemProxyUrl('https://openrouter.ai');
+      const { proxyUrl, targetUrl } = await resolveSystemProxyUrlForTargets();
       if (proxyUrl) {
         env.http_proxy = proxyUrl;
         env.https_proxy = proxyUrl;
         env.HTTP_PROXY = proxyUrl;
         env.HTTPS_PROXY = proxyUrl;
-        console.log('[OpenClaw] Injected system proxy for gateway:', proxyUrl);
+        console.log(`[OpenClaw] Injected system proxy for gateway via ${targetUrl}:`, proxyUrl);
       }
     }
 
