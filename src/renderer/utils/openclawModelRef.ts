@@ -30,7 +30,16 @@ export function resolveOpenClawModelRef<T extends Pick<Model, 'id' | 'providerKe
   if (!normalizedRef) return null;
 
   if (normalizedRef.includes('/')) {
-    return availableModels.find((model) => toOpenClawModelRef(model) === normalizedRef) ?? null;
+    const exactMatch = availableModels.find((model) => toOpenClawModelRef(model) === normalizedRef);
+    if (exactMatch) return exactMatch;
+
+    const modelId = normalizedRef.split('/').pop()!;
+    const idMatches = availableModels.filter((model) => model.id === modelId);
+    if (idMatches.length === 1) {
+      console.log('[openclawModelRef] provider fallback: resolved', normalizedRef, 'to', toOpenClawModelRef(idMatches[0]));
+      return idMatches[0];
+    }
+    return null;
   }
 
   const matchingModels = availableModels.filter((model) => model.id === normalizedRef);
