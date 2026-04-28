@@ -1168,6 +1168,13 @@ export const UserMessageItem: React.FC<{
   const [isHovered, setIsHovered] = useState(false);
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!expandedImage) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setExpandedImage(null); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [expandedImage]);
+
   // Transform content for display: strip IM media metadata, render images inline
   const displayContent = useMemo(
     () => parseUserMessageForDisplay(message.content || ''),
@@ -1285,6 +1292,13 @@ const AssistantMessageItem: React.FC<{
   const [isHovered, setIsHovered] = useState(false);
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
   const displayContent = mapDisplayText ? mapDisplayText(message.content) : message.content;
+
+  useEffect(() => {
+    if (!expandedImage) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setExpandedImage(null); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [expandedImage]);
 
   return (
     <div

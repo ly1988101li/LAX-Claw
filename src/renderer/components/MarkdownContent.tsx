@@ -509,7 +509,7 @@ const createMarkdownComponents = (
     if (typeof src === 'string') {
       if (src.startsWith('file://')) {
         resolvedSrc = src.replace(/^file:\/\//, 'localfile://');
-      } else if (src.startsWith('/')) {
+      } else if (src.startsWith('/') && !src.startsWith('//')) {
         resolvedSrc = `localfile://${src}`;
       }
     }
@@ -518,7 +518,7 @@ const createMarkdownComponents = (
         className={`max-w-full max-h-96 object-contain rounded-xl my-4${onImageClick ? ' cursor-pointer hover:opacity-90 transition-opacity' : ''}`}
         src={resolvedSrc}
         alt={alt}
-        onClick={onImageClick ? () => onImageClick(resolvedSrc) : undefined}
+        onClick={onImageClick && resolvedSrc ? () => onImageClick(resolvedSrc) : undefined}
         {...props}
       />
     );
