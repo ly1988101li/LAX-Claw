@@ -1668,6 +1668,11 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     setHoveredRailIndex(null);
   }, [currentSession?.id]);
 
+  const closeMenu = useCallback(() => {
+    setMenuPosition(null);
+    setShowConfirmDelete(false);
+  }, []);
+
   // Close menu on outside click
   useEffect(() => {
     if (!menuPosition) return;
@@ -1729,11 +1734,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     }
     setShowConfirmDelete(false);
   };
-
-  const closeMenu = useCallback(() => {
-    setMenuPosition(null);
-    setShowConfirmDelete(false);
-  }, []);
 
   // Open folder in Finder/Explorer
   const handleOpenFolder = useCallback(async () => {
