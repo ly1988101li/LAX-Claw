@@ -3,8 +3,10 @@ index 62dd1de9..4945baf1 100644
 --- a/src/agents/pi-tools.message-provider-policy.ts
 +++ b/src/agents/pi-tools.message-provider-policy.ts
 @@ -2,6 +2,7 @@ import { normalizeOptionalLowercaseString } from "../shared/string-coerce.js";
-
+ 
  const TOOL_DENY_BY_MESSAGE_PROVIDER: Readonly<Record<string, readonly string[]>> = {
    voice: ["tts"],
 +  wecom: ["exec", "process"],
  };
+ 
+ const TOOL_ALLOW_BY_MESSAGE_PROVIDER: Readonly<Record<string, readonly string[]>> = {
