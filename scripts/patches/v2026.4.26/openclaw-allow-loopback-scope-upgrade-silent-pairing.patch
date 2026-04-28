@@ -1,17 +1,13 @@
 diff --git a/src/gateway/server/ws-connection/message-handler.ts b/src/gateway/server/ws-connection/message-handler.ts
-index 1234567..89abcdef 100644
+index f5d85d7b..75cfc60a 100644
 --- a/src/gateway/server/ws-connection/message-handler.ts
 +++ b/src/gateway/server/ws-connection/message-handler.ts
-@@ -975,11 +975,14 @@ export function attachGatewayWsMessageHandler(params: {
+@@ -978,7 +978,7 @@ export function attachGatewayWsMessageHandler(params: {
+               ...clientPairingMetadata,
                ...(bootstrapPairingRoles ? { roles: bootstrapPairingRoles } : {}),
                silent:
-+                // LobsterAI patch: allow silent scope-upgrade for non-browser
-+                // loopback connections (internal tool-bind clients like cron).
-+                // PR #54694 blocked ALL silent scope-upgrades; restore for loopback.
-                 reason === "scope-upgrade"
+-                reason === "scope-upgrade"
++                reason === "scope-upgrade" && hasBrowserOriginHeader
                    ? false
                    : allowSilentLocalPairing ||
                      allowSilentBootstrapPairing ||
-                     allowSilentTrustedCidrsNodePairing,
-             });
-             const context = buildRequestContext();
