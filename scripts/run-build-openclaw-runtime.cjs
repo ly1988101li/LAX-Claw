@@ -87,7 +87,7 @@ if (!bashExecutable) {
 // 2. Prepend the directory containing the current node binary so that node,
 //    npm, pnpm, etc. are findable inside the bash script even when spawned
 //    through deeply-nested npm/cmd.exe process chains.
-const env = { ...process.env };
+const env = { ...process.env, OPENCLAW_PREPACK_PREPARED: '1' };
 if (process.platform === 'win32') {
   const nodeDir = path.dirname(process.execPath);
   const pathEntries = Object.entries(env).filter(([k]) => k.toUpperCase() === 'PATH');

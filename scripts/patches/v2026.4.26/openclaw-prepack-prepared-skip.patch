@@ -1,0 +1,19 @@
+diff --git a/scripts/openclaw-prepack.ts b/scripts/openclaw-prepack.ts
+index c1f3d564..068c5fa4 100644
+--- a/scripts/openclaw-prepack.ts
++++ b/scripts/openclaw-prepack.ts
+@@ -110,6 +110,14 @@ async function writeDistInventory(): Promise<void> {
+ }
+ 
+ async function main(): Promise<void> {
++  // Skip build and artifact check when artifacts are already prepared externally
++  // (e.g., when called from build scripts that have already run pnpm build && pnpm ui:build)
++  if (process.env.OPENCLAW_PREPACK_PREPARED === "1") {
++    console.error("prepack: OPENCLAW_PREPACK_PREPARED=1, skipping build and artifact check.");
++    await writeDistInventory();
++    return;
++  }
++
+   const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+   run(pnpmCommand, ["build"]);
+   run(pnpmCommand, ["ui:build"]);
