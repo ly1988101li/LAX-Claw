@@ -35,6 +35,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24.x'
+      - name: Install pnpm
+        run: npm install -g pnpm'
       - uses: actions/cache@v4
         with:
           path: ~/.npm
@@ -77,6 +79,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24.x'
+      - name: Install pnpm
+        run: npm install -g pnpm'
       - uses: actions/cache@v4
         with:
           path: ~\AppData\Local\npm-cache
@@ -112,6 +116,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24.x'
+      - name: Install pnpm
+        run: npm install -g pnpm'
       - uses: actions/cache@v4
         with:
           path: ~/.npm
@@ -161,3 +167,4 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
