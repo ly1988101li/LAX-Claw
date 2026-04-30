@@ -102,6 +102,7 @@ jobs:
         env:
           CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          OPENCLAW_SKIP_PLUGINS: "1"
 
       - uses: actions/upload-artifact@v4
         with:
