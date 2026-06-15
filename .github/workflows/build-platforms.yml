@@ -57,7 +57,7 @@ jobs:
       - name: Build macOS
         run: npm run dist:mac
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: macos-build
           path: release/*.dmg
@@ -91,7 +91,7 @@ jobs:
           npm run dist:win
         shell: powershell
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-build
           path: release/*.exe
@@ -124,7 +124,7 @@ jobs:
       - name: Build Linux
         run: npm run dist:linux
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: linux-build
           path: |
