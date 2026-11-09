@@ -138,7 +138,7 @@
     "katex": "^0.16.21",
     "mermaid": "^10.9.5",
     "nim-web-sdk-ng": "10.9.77-alpha.4",
-    "npm": "^11.11.0",
+    "npm": "^12.2.2",
     "qrcode.react": "^4.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
